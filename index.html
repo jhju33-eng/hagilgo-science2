@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>중화반응 실험 데이터 그래프 생성기</title>
+  
+  <!-- Tailwind CSS for modern responsive styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js for responsive plotting -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* Ensure inputs don't zoom automatically on iOS */
+    input, select {
+      font-size: 16px !important;
+    }
+    
+    /* Custom scrollbar for better look */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #ccc;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen py-4 px-2 sm:px-4 text-slate-800">
+
+  <div class="max-w-xl mx-auto bg-white rounded-2xl shadow-lg border border-slate-200 p-4 sm:p-6">
+    
+    <!-- Title Section -->
+    <div class="text-center mb-5">
+      <span class="inline-block bg-blue-100 text-blue-700 font-bold text-xs px-3 py-1 rounded-full mb-1">화학 실험 도우미</span>
+      <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">🧪 중화반응 실험 그래프 생성기</h1>
+      <p class="text-xs sm:text-sm text-slate-500 mt-1">HCl 15 mL에 NaOH를 투입할 때의 온도와 색 변화를 기록하세요.</p>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="grid grid-cols-3 gap-2 mb-4">
+      <button onclick="loadSampleData()" class="bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-semibold text-xs sm:text-sm py-2.5 px-2 rounded-xl transition shadow-sm flex items-center justify-center gap-1">
+        <span>✨</span> 예시 채우기
+      </button>
+      <button onclick="addCard()" class="bg-slate-600 hover:bg-slate-700 active:scale-95 text-white font-semibold text-xs sm:text-sm py-2.5 px-2 rounded-xl transition shadow-sm flex items-center justify-center gap-1">
+        <span>➕</span> 행 추가
+      </button>
+      <button onclick="resetData()" class="bg-rose-500 hover:bg-rose-600 active:scale-95 text-white font-semibold text-xs sm:text-sm py-2.5 px-2 rounded-xl transition shadow-sm flex items-center justify-center gap-1">
+        <span>🔄</span> 초기화
+      </button>
+    </div>
+
+    <!-- Data Entry Section -->
+    <div class="bg-slate-50 rounded-xl p-2.5 sm:p-3 border border-slate-200 mb-4">
+      
+      <!-- Table Header (Spacious 3-column layout) -->
+      <div class="grid grid-cols-12 gap-1.5 sm:gap-2 mb-2 px-1 text-center font-bold text-xs text-slate-600">
+        <div class="col-span-3">NaOH 부피</div>
+        <div class="col-span-4">측정 온도</div>
+        <div class="col-span-4">지시약 색상</div>
+        <div class="col-span-1"></div>
+      </div>
+
+      <!-- Dynamic Data List -->
+      <div id="dataList" class="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+        <!-- Rows inserted via JS -->
+      </div>
+    </div>
+
+    <!-- Main Render Chart Button -->
+    <button onclick="generateCharts()" class="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-base py-3.5 px-4 rounded-xl transition shadow-md flex items-center justify-center gap-2 mb-6">
+      <span>📊</span> 그래프 그려서 확인하기
+    </button>
+
+    <!-- Charts Section -->
+    <div id="chartsSection" class="space-y-6">
+      
+      <!-- Chart 1: Temperature -->
+      <div class="bg-slate-50 border border-slate-200 p-3 sm:p-4 rounded-xl">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="font-bold text-sm sm:text-base text-slate-800 flex items-center gap-1.5">
+            <span class="text-red-500">🔥</span> NaOH 부피별 최고 온도 변화
+          </h2>
+          <span class="text-[11px] text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-200">단위: °C</span>
+        </div>
+        <div class="relative h-52 sm:h-60 w-full bg-white p-2 rounded-lg border border-slate-100">
+          <canvas id="tempChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 2: Indicator Color / pH -->
+      <div class="bg-slate-50 border border-slate-200 p-3 sm:p-4 rounded-xl">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="font-bold text-sm sm:text-base text-slate-800 flex items-center gap-1.5">
+            <span class="text-purple-500">🎨</span> 만능지시약 색상 (pH) 변화
+          </h2>
+          <span class="text-[11px] text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-200">pH 1 ~ 14</span>
+        </div>
+        <div class="relative h-56 sm:h-64 w-full bg-white p-2 rounded-lg border border-slate-100">
+          <canvas id="phChart"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Universal Indicator Color & pH Data Mapping
+    const colorOptions = [
+      { label: "🔴 빨강 (pH 1.5)", val: 1.5, color: "#ef4444" },
+      { label: "🟠 주황 (pH 3.5)", val: 3.5, color: "#f97316" },
+      { label: "🟡 노랑 (pH 5.5)", val: 5.5, color: "#eab308" },
+      { label: "🟢 초록 (pH 7.0)", val: 7.0, color: "#22c55e" },
+      { label: "🔵 청록 (pH 8.5)", val: 8.5, color: "#06b6d4" },
+      { label: "🟦 파랑 (pH 10.5)", val: 10.5, color: "#3b82f6" },
+      { label: "🟣 보라 (pH 13.0)", val: 13.0, color: "#a855f7" }
+    ];
+
+    const defaultVolumes = [0, 3, 6, 9, 12, 15, 18, 21, 24];
+    let tempChartInstance = null;
+    let phChartInstance = null;
+
+    // Initialize default table rows
+    function initList() {
+      const list = document.getElementById("dataList");
+      list.innerHTML = "";
+      defaultVolumes.forEach(v => addCard(v));
+    }
+
+    // Add a single input row card with clean spacing
+    function addCard(vol = "") {
+      const list = document.getElementById("dataList");
+      const card = document.createElement("div");
+      card.className = "data-row grid grid-cols-12 gap-1.5 sm:gap-2 items-center bg-white p-2 rounded-xl border border-slate-200 shadow-sm transition hover:border-blue-300";
+
+      let selectHtml = `<select class="color-select w-full bg-slate-50 border border-slate-300 rounded-lg px-1.5 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">`;
+      colorOptions.forEach(opt => {
+        selectHtml += `<option value="${opt.val}" data-color="${opt.color}">${opt.label}</option>`;
+      });
+      selectHtml += `</select>`;
+
+      card.innerHTML = `
+        <!-- Volume Column -->
+        <div class="col-span-3 flex items-center bg-blue-50/70 border border-blue-200 rounded-lg px-1.5 py-1">
+          <input type="number" class="vol-input w-full bg-transparent text-center font-bold text-blue-700 text-xs sm:text-sm focus:outline-none" value="${vol}" placeholder="0" step="0.5" inputmode="decimal">
+          <span class="text-[10px] sm:text-xs text-blue-500 font-semibold ml-0.5">mL</span>
+        </div>
+
+        <!-- Temperature Column -->
+        <div class="col-span-4 flex items-center bg-slate-50 border border-slate-300 rounded-lg px-1.5 py-1 focus-within:ring-2 focus-within:ring-blue-500">
+          <input type="number" class="temp-input w-full bg-transparent text-center font-semibold text-slate-800 text-xs sm:text-sm focus:outline-none" placeholder="20.0" step="0.1" inputmode="decimal">
+          <span class="text-[10px] sm:text-xs text-slate-400 ml-0.5">°C</span>
+        </div>
+
+        <!-- Color Select Column -->
+        <div class="col-span-4">
+          ${selectHtml}
+        </div>
+
+        <!-- Delete Button -->
+        <div class="col-span-1 text-center">
+          <button onclick="this.closest('.data-row').remove()" class="text-slate-300 hover:text-rose-500 active:scale-90 transition font-bold text-sm">
+            ✕
+          </button>
+        </div>
+      `;
+      list.appendChild(card);
+    }
+
+    // Reset data
+    function resetData() {
+      initList();
+      if(tempChartInstance) tempChartInstance.destroy();
+      if(phChartInstance) phChartInstance.destroy();
+    }
+
+    // Load pre-configured sample experiment data
+    function loadSampleData() {
+      initList();
+      // Theoretical neutralization reaction values (HCl 15ml + NaOH 15ml neutralization peak)
+      const sampleTemps = [20.0, 21.6, 23.2, 24.8, 26.3, 27.8, 27.1, 26.2, 25.4];
+      const sampleColors = [1.5, 3.5, 3.5, 5.5, 5.5, 7.0, 8.5, 10.5, 13.0];
+
+      const rows = document.querySelectorAll(".data-row");
+      rows.forEach((row, i) => {
+        if (i < sampleTemps.length) {
+          row.querySelector(".temp-input").value = sampleTemps[i];
+          row.querySelector(".color-select").value = sampleColors[i];
+        }
+      });
+      generateCharts();
+    }
+
+    // Generate both charts based on user inputs
+    function generateCharts() {
+      const rows = document.querySelectorAll(".data-row");
+      const volumes = [];
+      const temps = [];
+      const phVals = [];
+      const pointColors = [];
+
+      rows.forEach(row => {
+        const v = parseFloat(row.querySelector(".vol-input").value);
+        const t = parseFloat(row.querySelector(".temp-input").value);
+        const selectEl = row.querySelector(".color-select");
+        const ph = parseFloat(selectEl.value);
+        const color = selectEl.options[selectEl.selectedIndex].getAttribute("data-color");
+
+        if (!isNaN(v) && !isNaN(t)) {
+          volumes.push(v);
+          temps.push(t);
+          phVals.push(ph);
+          pointColors.push(color);
+        }
+      });
+
+      if (volumes.length === 0) {
+        alert("측정된 온도 데이터를 1개 이상 입력해주세요.");
+        return;
+      }
+
+      // Clear existing chart instances
+      if (tempChartInstance) tempChartInstance.destroy();
+      if (phChartInstance) phChartInstance.destroy();
+
+      // Render 1: Temperature Line Chart
+      const ctxTemp = document.getElementById("tempChart").getContext("2d");
+      tempChartInstance = new Chart(ctxTemp, {
+        type: 'line',
+        data: {
+          labels: volumes,
+          datasets: [{
+            label: '온도 (°C)',
+            data: temps,
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            borderWidth: 3,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            pointBackgroundColor: '#ef4444',
+            fill: true,
+            tension: 0.25
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `온도: ${ctx.parsed.y} °C`
+              }
+            }
+          },
+          scales: {
+            x: { 
+              title: { display: true, text: 'NaOH 누적 부피 (mL)', font: { size: 11, weight: 'bold' } } 
+            },
+            y: { 
+              title: { display: true, text: '온도 (°C)', font: { size: 11, weight: 'bold' } },
+              suggestedMin: Math.min(...temps) - 1,
+              suggestedMax: Math.max(...temps) + 1
+            }
+          }
+        }
+      });
+
+      // Render 2: pH / Color Line Chart
+      const ctxPh = document.getElementById("phChart").getContext("2d");
+      phChartInstance = new Chart(ctxPh, {
+        type: 'line',
+        data: {
+          labels: volumes,
+          datasets: [{
+            label: 'pH',
+            data: phVals,
+            borderColor: '#94a3b8',
+            borderWidth: 2,
+            pointRadius: 7,
+            pointHoverRadius: 9,
+            pointBackgroundColor: pointColors,
+            pointBorderColor: '#334155',
+            pointBorderWidth: 1.5,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `pH: ${ctx.parsed.y}`
+              }
+            }
+          },
+          scales: {
+            x: { 
+              title: { display: true, text: 'NaOH 누적 부피 (mL)', font: { size: 11, weight: 'bold' } } 
+            },
+            y: { 
+              title: { display: true, text: 'pH 스펙트럼', font: { size: 11, weight: 'bold' } },
+              min: 0,
+              max: 14,
+              ticks: {
+                stepSize: 2,
+                callback: function(value) {
+                  if (value === 2) return '강산성(2)';
+                  if (value === 7) return '중성(7)';
+                  if (value === 12) return '강염기성(12)';
+                  return value;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Initialize list on page load
+    window.onload = function() {
+      initList();
+    };
+  </script>
+</body>
+</html>
